@@ -1,0 +1,26 @@
+kumuluzee:
+  name: placila-service
+  env:
+    name: dev
+  version: 1.0.0
+  server:
+    base-url: http://localhost:8080
+    http:
+      port: 8080
+  datasources:
+    - jndi-name: jdbc/PlacilaDS
+      connection-url: jdbc:postgresql://192.168.99.100:5432/racuni
+      username: dbuser
+      password: postgres
+  config:
+    consul:
+      agent: http://192.168.99.100:8500
+  discovery:
+    cluster: 1
+    consul:
+      agent: http://192.168.99.100:8500
+    ttl: 20
+    ping-interval: 15
+
+rest-properties:
+  maintenance-mode: false

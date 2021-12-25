@@ -1,0 +1,1 @@
+INSERT INTO racuni (status, customer_id, customer_username, customer_email, customer_first_name, customer_last_name, polnilnica_id, terminDateFrom,terminDateTo) VALUES ('completed', 1, 'testuser1', 'test@test.si', 'User', 'Bloke', 1, 1636376400, 1636380000);
