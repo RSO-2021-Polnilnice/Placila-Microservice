@@ -12,7 +12,11 @@
     <artifactId>placila-api</artifactId>
 
     <dependencies>
-
+        <dependency>
+            <groupId>com.kumuluz.ee.health</groupId>
+            <artifactId>kumuluzee-health</artifactId>
+            <version>2.4.3</version>
+        </dependency>
         <dependency>
             <groupId>com.kumuluz.ee.discovery</groupId>
             <artifactId>kumuluzee-discovery-consul</artifactId>
@@ -33,6 +37,11 @@
         <dependency>
             <groupId>si.fri.rso</groupId>
             <artifactId>placila-services</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.12</version>
         </dependency>
     </dependencies>
 

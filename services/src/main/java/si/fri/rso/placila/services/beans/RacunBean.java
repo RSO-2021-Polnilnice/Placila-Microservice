@@ -48,13 +48,31 @@ public class RacunBean {
         }
     }
 
+    /**  GET BY RACUN BY TERMIN ID **/
+    public Racun getRacunByTerminId(Integer terminId) {
+        TypedQuery<RacunEntity> query = em.createNamedQuery(
+                "RacunEntity.getByTerminId", RacunEntity.class);
+        query.setParameter("terminId", terminId);
+
+        List<RacunEntity> resultList = query.getResultList();
+        if (resultList.isEmpty()) {
+            return  null;
+        } else {
+            RacunEntity result =  resultList.get(0);
+            return RacunConverter.toDto(result);
+        }
+    }
+
     /** POST **/
     /** Create a new "racun"  **/
     public Racun createRacun(Racun r) {
 
         RacunEntity racunEntity = new RacunEntity();
         racunEntity.setStatus(r.getStatus());
+        racunEntity.setTimestamp(r.getTimestamp());
+        racunEntity.setPrice(r.getPrice());
         racunEntity.setPolnilnicaId(r.getPolnilnicaId());
+        racunEntity.setTerminId(r.getTerminId());
         racunEntity.setTerminDateFrom(r.getTerminDateFrom());
         racunEntity.setTerminDateTo(r.getTerminDateTo());
         racunEntity.setCustomerId(r.getCustomerId());
@@ -81,29 +99,6 @@ public class RacunBean {
     }
 
 
-    /** POST **/
-    /** Change status of "racun"  **/
-    public Racun changeRacunStatus(Integer id, String status) {
-
-        RacunEntity racunEntity= em.find(RacunEntity.class, id);
-        racunEntity.setStatus(status);
-
-        try {
-            beginTx();
-            em.persist(racunEntity);
-            commitTx();
-            // Refresh polnilnica entity so it shows latest data
-            em.refresh(racunEntity);
-        }
-        catch (Exception e) {
-            rollbackTx();
-        }
-        if (racunEntity.getId() == null) {
-            throw new RuntimeException("Entity was not persisted");
-        }
-
-        return RacunConverter.toDto(racunEntity);
-    }
 
     /**  TRANSACTION METHODS **/
     private void beginTx() {

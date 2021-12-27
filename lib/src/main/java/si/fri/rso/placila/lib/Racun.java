@@ -4,10 +4,14 @@ public class Racun {
 
     private Integer id;
     private String status;
+    private Long timestamp;
+    private Float price;
     // "Termin" variables
     private Integer polnilnicaId;
     private Long terminDateFrom;
     private Long terminDateTo;
+    private Integer terminId;
+
     // "User" variables
     private Integer customerId;
     private String customerUsername;
@@ -29,6 +33,22 @@ public class Racun {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Long getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(Long timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public Float getPrice() {
+        return price;
+    }
+
+    public void setPrice(Float price) {
+        this.price = price;
     }
 
     public Integer getPolnilnicaId() {
@@ -54,6 +74,14 @@ public class Racun {
 
     public void setTerminDateTo(Long terminDateTo) {
         this.terminDateTo = terminDateTo;
+    }
+
+    public Integer getTerminId() {
+        return terminId;
+    }
+
+    public void setTerminId(Integer terminId) {
+        this.terminId = terminId;
     }
 
     public Integer getCustomerId() {

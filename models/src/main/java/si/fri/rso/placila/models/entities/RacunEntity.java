@@ -14,7 +14,10 @@ import javax.persistence.*;
                         query = "SELECT racun FROM RacunEntity racun WHERE racun.id = :id"),
 
                 @NamedQuery(name = "RacunEntity.getByCustomerId",
-                        query = "SELECT racun FROM RacunEntity racun WHERE racun.customerId = :customerId")
+                        query = "SELECT racun FROM RacunEntity racun WHERE racun.customerId = :customerId"),
+
+                @NamedQuery(name = "RacunEntity.getByTerminId",
+                        query = "SELECT racun FROM RacunEntity racun WHERE racun.terminId = :terminId")
         })
 
 public class RacunEntity {
@@ -26,6 +29,12 @@ public class RacunEntity {
 
     @Column(name = "status", nullable = false)
     private String status;
+
+    @Column(name = "timestamp", nullable = false)
+    private Long timestamp;
+
+    @Column(name = "price", nullable = false)
+    private Float price;
 
     @Column(name = "customer_id", nullable = false)
     private Integer customerId;
@@ -45,11 +54,23 @@ public class RacunEntity {
     @Column(name = "polnilnica_id", nullable = false)
     private Integer polnilnicaId;
 
+    @Column(name = "terminId", nullable = false)
+    private Integer terminId;
+
     @Column(name = "terminDateFrom", nullable = false)
     private Long terminDateFrom;
 
     @Column(name = "terminDateTo", nullable = false)
     private Long terminDateTo;
+
+    public Integer getTerminId() {
+        return terminId;
+    }
+
+    public void setTerminId(Integer terminId) {
+        this.terminId = terminId;
+    }
+
 
     public Integer getId() {
         return id;
@@ -61,6 +82,22 @@ public class RacunEntity {
 
     public String getStatus() {
         return status;
+    }
+
+    public void setTimestamp(Long timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public Long getTimestamp() {
+        return timestamp;
+    }
+
+    public void setPrice(Float price) {
+        this.price = price;
+    }
+
+    public Float getPrice() {
+        return price;
     }
 
     public void setStatus(String status) {

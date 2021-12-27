@@ -9,7 +9,7 @@ kumuluzee:
       port: 8080
   datasources:
     - jndi-name: jdbc/PlacilaDS
-      connection-url: jdbc:postgresql://192.168.99.100:5432/racuni
+      connection-url: jdbc:postgresql://192.168.99.100:5434/racuni
       username: dbuser
       password: postgres
   config:
@@ -21,6 +21,17 @@ kumuluzee:
       agent: http://192.168.99.100:8500
     ttl: 20
     ping-interval: 15
+  health:
+    checks:
+      data-source-health-check:
+        type: liveness
+        jndi-name: jdbc/PlacilaDS
+    metrics:
+      web-instrumentation:
+        - name: placila-endpoint
+          url-pattern: /v1/placila/*
 
 rest-properties:
   maintenance-mode: false
+  broken: false
+  price-per-hour: 3

@@ -12,6 +12,7 @@
     <artifactId>placila-services</artifactId>
 
     <dependencies>
+
         <dependency>
             <groupId>com.kumuluz.ee</groupId>
             <artifactId>kumuluzee-cdi-weld</artifactId>

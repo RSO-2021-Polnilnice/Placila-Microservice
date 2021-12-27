@@ -14,6 +14,11 @@ public class RestProperties {
 
     @ConfigValue(watch = true)
     private Boolean maintenanceMode;
+
+    @ConfigValue(watch = true)
+    private Float pricePerHour;
+
+
     
 
     private Boolean broken;
@@ -24,6 +29,14 @@ public class RestProperties {
 
     public void setMaintenanceMode(final Boolean maintenanceMode) {
         this.maintenanceMode = maintenanceMode;
+    }
+
+    public Float getPricePerHour() {
+        return this.pricePerHour;
+    }
+
+    public void setPricePerHour(final Float pricePerHour) {
+        this.pricePerHour = pricePerHour;
     }
 
     public Boolean getBroken() {

@@ -10,3 +10,4 @@ import javax.ws.rs.core.Application;
 public class PlacilaApplication extends Application {
 
 }
+
