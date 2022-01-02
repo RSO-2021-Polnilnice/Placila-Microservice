@@ -19,11 +19,11 @@ kumuluzee:
       password: postgres
   config:
     consul:
-      agent: http://192.168.99.100:8500
+      agent: http://consul:8500
   discovery:
     cluster: 1
     consul:
-      agent: http://192.168.99.100:8500
+      agent: http://consul:8500
     ttl: 20
     ping-interval: 15
   health:
