@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kumuluz.ee.cors.annotations.CrossOrigin;
 import com.kumuluz.ee.discovery.annotations.DiscoverService;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.*;
@@ -25,6 +26,7 @@ import javax.inject.Inject;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
@@ -34,6 +36,7 @@ import java.util.Optional;
 @Path("/placila")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
+@CrossOrigin(allowOrigin = "*")
 public class RacunResource {
 
     @Inject
@@ -98,7 +101,7 @@ public class RacunResource {
 
     /** Create new racun **/
     @POST
-    @Path("/rezerviraj")
+    @Path("/rezerviraj_")
     @Produces("application/json")
     public Response createRacun(Racun r) {
         System.out.println("Racun: " + r.toString());
@@ -141,6 +144,150 @@ public class RacunResource {
                 Long listTerminTo = terminList.get(i).getDateTo();
 
                 if (r.getTerminDateFrom() <= listTerminTo && listTerminFrom <= r.getTerminDateTo()) {
+                    System.out.println("Your timeframe overlaps with termin with id" + terminList.get(i).getId() + ".");
+                    return Response.status(Response.Status.BAD_REQUEST).entity("Your timeframe overlaps with termin with id " + terminList.get(i).getId() + ".").build();
+                }
+            }
+        }
+        // No overlapping found
+
+        /** Call user MS and check if user has adequate funds **/
+        String uporabnikiString = myHttpGet(uporabniki_host.get() + "/v1/uporabniki/" + r.getCustomerId());
+        Uporabnik uporabnik = null;
+        try {
+            uporabnik =  mapper.readValue(uporabnikiString, Uporabnik.class);
+        } catch (JsonProcessingException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Uporabnik with id " + r.getCustomerId() + " does not exist.").build();
+        }
+        // Check his balance
+        if (pricePerHour.getPricePerHour() == null ) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Price per hour is not available and we cannot book. Sorry.").build();
+        }
+        Long diff = r.getTerminDateTo() - r.getTerminDateFrom();
+        Float wtf = (diff.floatValue() / 3600f);
+        Float terminPrice = wtf * pricePerHour.getPricePerHour();
+        System.out.println("wtf: " + wtf);
+        System.out.println("termin price: " + terminPrice);
+        if (uporabnik.getFunds() < terminPrice) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Not enough funds.").build();
+        }
+
+        /** Call polnilnica MS and book the termin **/
+        // Create json body for POST call
+        JSONObject jsonBody = new JSONObject();
+        jsonBody.put("userId", r.getCustomerId());
+        jsonBody.put("dateFrom", r.getTerminDateFrom());
+        jsonBody.put("dateTo", r.getTerminDateTo());
+        // POST the termin to polnilnica api
+        String polnilnicaPostResponse = myHttpPost(polnilnice_host.get() + "/v1/polnilnice/" + r.getPolnilnicaId() + "/termini", jsonBody.toString());
+        // If everything went ok, we get the termin as response
+        Termin termin = null;
+        try {
+            termin =  mapper.readValue(polnilnicaPostResponse, Termin.class);
+        } catch (JsonProcessingException e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Something went wrong while booking.").build();
+        }
+        /** Call uporabniki MS and substract funds **/
+        uporabnik.setFunds(uporabnik.getFunds() - terminPrice);
+        String putBodyString = null;
+        try {
+            putBodyString = mapper.writeValueAsString(uporabnik);
+        } catch (JsonProcessingException e) {
+            myHttpsDelete(polnilnice_host.get() + "/v1/termini/" + termin.getId());
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Something went wrong while updating user value.").build();
+        }
+        String uporabnikPutResponse = myHttpPut(uporabniki_host.get() + "/v1/uporabniki/" + r.getCustomerId(), putBodyString);
+        try {
+            uporabnikPutResponse = mapper.writeValueAsString(uporabnik);
+        } catch (JsonProcessingException e) {
+            myHttpsDelete(polnilnice_host.get() + "/v1/termini/" + termin.getId());
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Something went wrong while updating user funds.").build();
+        }
+
+        r.setStatus("payment");
+        r.setPrice(terminPrice);
+        r.setTerminId(termin.getId());
+        r.setTimestamp(System.currentTimeMillis() / 1000L);
+        Racun racun = racunBean.createRacun(r);
+
+        return Response.status(Response.Status.CREATED).entity(racun).build();
+
+    }
+
+    /** Create new racun **/
+    @POST
+    @Path("/rezerviraj")
+    @Produces("application/json")
+    public Response createRacun_(String body) {
+        System.out.println(body);
+
+        if (body.isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("No POST body found.").build();
+        }
+        JSONObject bodyObject = new JSONObject(body);
+
+        String u_host = null;
+        String p_host = null;
+        Racun r = new Racun();
+        try {
+            u_host = bodyObject.getString("u_host");
+            p_host = bodyObject.getString("p_host");
+            if (u_host.isEmpty() || p_host.isEmpty()) {
+                throw new JsonProcessingException("Error while aprsing u_host or p_host"){};
+            }
+            JSONObject racunObject = bodyObject.getJSONObject("racun");
+
+            r.setCustomerId(racunObject.getInt("customerId"));
+            r.setCustomerUsername(racunObject.getString("customerUsername"));
+            r.setCustomerEmail(racunObject.getString("customerEmail"));
+            r.setCustomerFirstName(racunObject.getString("customerFirstName"));
+            r.setCustomerLastName(racunObject.getString("customerLastName"));
+            r.setPolnilnicaId(racunObject.getInt("polnilnicaId"));
+            r.setPrice(racunObject.getFloat("price"));
+            r.setTerminDateTo(racunObject.getLong("terminDateTo"));
+            r.setTerminDateFrom(racunObject.getLong("terminDateFrom"));
+        } catch (JsonProcessingException e) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Wrong structure for POST body.").build();
+        }
+        // check body
+        if (r.getCustomerId() == null || r.getCustomerUsername().isEmpty() || r.getCustomerEmail().isEmpty()
+                || r.getCustomerFirstName().isEmpty() || r.getCustomerLastName().isEmpty()
+                || r.getPolnilnicaId() == null || r.getTerminDateFrom() == null || r.getTerminDateTo() == null) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("customerId, customerUsername, customerEmail, customerFirstName, customerLastName, terminId, terminDateFrom, terminDateTo are necessary parameters").build();
+        }
+
+        if (r.getTerminDateTo() - r.getTerminDateFrom() <= 0) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Impossible time bracket provided.").build();
+        }
+
+        uporabniki_host =  Optional.of(u_host);
+        polnilnice_host =  Optional.of(p_host);
+
+        /** Call polnilnica MS and check if termin is actually available  **/
+        // Get list of termini for polnilnica with provided id
+        String polnilnicaTerminiString = myHttpGet(polnilnice_host.get() + "/v1/polnilnice/" + r.getPolnilnicaId() + "/termini");
+        // Map json string into Termin list
+        List<Termin> terminList = null;
+        try {
+            terminList =  mapper.readValue(polnilnicaTerminiString, new TypeReference<List<Termin>>() {});
+        } catch (JsonProcessingException e) {
+            // Didn't receive list of termini, check if polnilnica exists
+            if (polnilnicaTerminiString.startsWith("Polnilnica with id")) {
+                return Response.status(Response.Status.NOT_FOUND).entity(polnilnicaTerminiString).build();
+            }
+            // If polnilnica doesn't exist and the service didn't say the termini list is empty, something went wrong there
+            if (!polnilnicaTerminiString.startsWith("No termini found")) {
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(polnilnicaTerminiString).build();
+            }
+        }
+        // Check for overlapping if we received a list of termini
+        if (terminList != null && !terminList.isEmpty()) {
+            for (int i = 0; i < terminList.size(); i++) {
+                Long listTerminFrom = terminList.get(i).getDateFrom();
+                Long listTerminTo = terminList.get(i).getDateTo();
+
+                if (r.getTerminDateFrom() <= listTerminTo && listTerminFrom <= r.getTerminDateTo()) {
+
                     return Response.status(Response.Status.BAD_REQUEST).entity("Your timeframe overlaps with termin with id " + terminList.get(i).getId() + ".").build();
                 }
             }
@@ -211,6 +358,7 @@ public class RacunResource {
     }
 
 
+
     @GET
     @Path("/test")
     @Produces("application/json")
@@ -224,6 +372,118 @@ public class RacunResource {
     @Path("/odpovej/{terminId}")
     @Produces("application/json")
     public Response odpovejTermin(@PathParam("terminId") Integer terminId) {
+
+        Racun er = racunBean.getRacunByTerminId(terminId);
+        if (er == null) {
+            return Response.status(Response.Status.NOT_FOUND).entity("Racun for this termin does not exist. Please contact support").build();
+        }
+
+
+        String uporabnikiString = myHttpGet(uporabniki_host.get() + "/v1/uporabniki/" + er.getCustomerId());
+        Uporabnik uporabnik = null;
+        try {
+            uporabnik =  mapper.readValue(uporabnikiString, Uporabnik.class);
+        } catch (JsonProcessingException e) {}
+
+        if (uporabnik != null) {
+            uporabnik.setFunds(uporabnik.getFunds() + er.getPrice());
+            String putBodyString = null;
+            try {
+                putBodyString = mapper.writeValueAsString(uporabnik);
+            } catch (JsonProcessingException e) {
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Problem while parsing user.").build();
+            }
+            myHttpPut(uporabniki_host.get() + "/v1/uporabniki/" + er.getCustomerId(), putBodyString);
+        }
+
+        myHttpsDelete(polnilnice_host.get() + "/v1/termini/" + er.getTerminId());
+
+        System.out.println(er.getCustomerEmail());
+        System.out.println(er.getCustomerFirstName());
+
+        RacunEntity newRacun = RacunConverter.toEntity(er);
+        Racun actuallyRacun = RacunConverter.toDto(newRacun);
+
+        System.out.println(actuallyRacun.getCustomerEmail());
+        System.out.println(actuallyRacun.getCustomerFirstName());
+        actuallyRacun.setTimestamp(System.currentTimeMillis() / 1000L);
+        actuallyRacun.setStatus("cancelled");
+
+
+
+        Racun racun = racunBean.createRacun(actuallyRacun);
+        return Response.status(Response.Status.CREATED).entity(racun).build();
+
+    }
+
+    @POST
+    @Path("/nakazi_/{uporabnik_id}")
+    @Produces("application/json")
+    public Response nakazi_(@PathParam("uporabnik_id") Integer uporabnikId, String body) {
+        if (body.isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("No POST body found.").build();
+        }
+        JSONObject bodyObject = new JSONObject(body);
+
+        Float nakazilo = bodyObject.getFloat("nakazilo");
+        String u_host = bodyObject.getString("u_host");
+
+
+        if (nakazilo == null || nakazilo.isNaN()) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Problem while parsing body.").build();
+        }
+
+        uporabniki_host = Optional.of(u_host);
+
+        String uporabnikiString = myHttpGet(uporabniki_host.get() + "/v1/uporabniki/" + uporabnikId);
+        System.out.println(uporabnikiString);
+        Uporabnik uporabnik = null;
+        try {
+            uporabnik =  mapper.readValue(uporabnikiString, Uporabnik.class);
+        } catch (JsonProcessingException e) {
+            System.out.println(e.getMessage());
+        }
+
+        if (uporabnik != null) {
+            uporabnik.setFunds(uporabnik.getFunds() + nakazilo);
+            String putBodyString = null;
+            try {
+                putBodyString = mapper.writeValueAsString(uporabnik);
+            } catch (JsonProcessingException e) {
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Problem while parsing user.").build();
+            }
+            myHttpPut(uporabniki_host.get() + "/v1/uporabniki/" + uporabnikId, putBodyString);
+        } else {
+            return Response.status(Response.Status.NOT_FOUND).entity("User with id " + uporabnikId + " was not found.").build();
+        }
+        Racun r = new Racun();
+        r.setStatus("transfer");
+        r.setCustomerFirstName(uporabnik.getFirstName());
+        r.setCustomerLastName(uporabnik.getLastName());
+        r.setTimestamp(System.currentTimeMillis() / 1000L);
+        r.setPrice(nakazilo);
+        r.setPolnilnicaId(-1);
+        r.setTerminId(-1);
+        r.setTerminDateTo((long) -1);
+        r.setTerminDateFrom((long) -1);
+        r.setCustomerEmail(uporabnik.getEmail());
+        r.setCustomerId(uporabnik.getId());
+        r.setCustomerUsername(uporabnik.getUsername());
+
+        Racun racun = racunBean.createRacun(r);
+        return Response.status(Response.Status.CREATED).entity(racun).build();
+
+    }
+
+
+
+    /** Create new racun **/
+    @POST
+    @Path("/odpovej_/{terminId}/uporabniki_host={u_host},polnilnice_host={p_host}")
+    @Produces("application/json")
+    public Response odpovejTermin_(@PathParam("terminId") Integer terminId, @PathParam("u_host") String u_host, @PathParam("p_host") String p_host) {
+        uporabniki_host = Optional.of(u_host);
+        polnilnice_host = Optional.of(p_host);
 
         Racun er = racunBean.getRacunByTerminId(terminId);
         if (er == null) {

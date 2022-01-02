@@ -2,8 +2,18 @@ package si.fri.rso.placila.lib;
 
 public class Uporabnik {
     private Integer id;
-    private String username;
     private String email;
+    private String username;
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    private String password;
     private String firstName;
     private String lastName;
     private Integer yearBorn;
