@@ -12,6 +12,12 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.RequestBody;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.json.JSONObject;
 import si.fri.rso.placila.lib.Racun;
 import si.fri.rso.placila.lib.Termin;
@@ -60,6 +66,13 @@ public class RacunResource {
 
 
     /** GET price per hour of charging **/
+    @Operation(description = "Get price per hour for charging station bookings.", summary = "Per hour")
+    @APIResponses({
+        @APIResponse(responseCode = "200",
+                description = "Price per hour"),
+        @APIResponse(responseCode = "404",
+                description = "Price per hour not found.")
+    })
     @GET
     @Path("/cenik")
     @Produces("application/json")
@@ -70,7 +83,15 @@ public class RacunResource {
 
         return Response.status(Response.Status.OK).entity(pricePerHour.getPricePerHour()).build();
     }
-
+    @Operation(description = "Get transactions for user with provided ID.", summary = "Get transactions for user.")
+    @APIResponses({
+            @APIResponse(responseCode = "200",
+                    description = "List of transactions",
+                    content = @Content(
+                            schema = @Schema(implementation = Racun.class))),
+            @APIResponse(responseCode = "404",
+                    description = "User with this ID was not found")
+    })
     /** GET racuni for user **/
     @GET
     @Path("/uporabnik/{userId}")
@@ -86,6 +107,16 @@ public class RacunResource {
     }
 
     /** GET racun by id **/
+    @Operation(description = "Get transactions with provided ID.", summary = "Get transaction.")
+    @APIResponses({
+            @APIResponse(responseCode = "200",
+                    description = "Transactions with provided ID.",
+                    content = @Content(
+                            schema = @Schema(implementation = Racun.class))),
+            @APIResponse(responseCode = "404",
+                    description = "Transaction ID was not found")
+    })
+    /** GET racuni for user **/
     @GET
     @Path("/{id}")
     @Produces("application/json")
@@ -99,11 +130,30 @@ public class RacunResource {
         return Response.status(Response.Status.OK).entity(racun).build();
     }
 
+    @Operation(description = "Book a timeslot using service discovery. Checks funds by calling user microservice and availability on charging stations microservice.", summary = "Book a timeslot.")
+    @APIResponses({
+            @APIResponse(responseCode = "400",
+                    description = "Incorrect POST body."
+            ),
+            @APIResponse(responseCode = "404",
+                    description = "Charging station with this ID does not exist."
+            ),
+            @APIResponse(responseCode = "500",
+                    description = "Unknown error while booking."
+            ),
+            @APIResponse(responseCode = "200",
+                    description = "Booking succesful, returns a transaction confirmation.",
+                    content = @Content(
+                            schema = @Schema(implementation = Racun.class))),
+    })
     /** Create new racun **/
     @POST
     @Path("/rezerviraj_")
     @Produces("application/json")
-    public Response createRacun(Racun r) {
+    public Response createRacun(@RequestBody(
+            description = "DTO object with image metadata.",
+            required = true, content = @Content(
+            schema = @Schema(implementation = Racun.class))) Racun r) {
         System.out.println("Racun: " + r.toString());
         // check body
         if (r.getCustomerId() == null || r.getCustomerUsername().isEmpty() || r.getCustomerEmail().isEmpty()
@@ -116,9 +166,6 @@ public class RacunResource {
             return Response.status(Response.Status.BAD_REQUEST).entity("Impossible time bracket provided.").build();
         }
 
-        //TODO: zakomentiraj ti 2 vrstici in bi moglo uporabit to kar consul najde
-        uporabniki_host =  Optional.of("http://192.168.99.100:8080");
-        polnilnice_host =  Optional.of("http://192.168.99.100:8081");
 
         /** Call polnilnica MS and check if termin is actually available  **/
         // Get list of termini for polnilnica with provided id
@@ -213,12 +260,29 @@ public class RacunResource {
         return Response.status(Response.Status.CREATED).entity(racun).build();
 
     }
-
+    @Operation(description = "Book a timeslot using provided service IP-s in POST body. Checks funds by calling user microservice and availability on charging stations microservice.", summary = "Book a timeslot.")
+    @APIResponses({
+            @APIResponse(responseCode = "400",
+                    description = "Incorrect POST body."
+            ),
+            @APIResponse(responseCode = "404",
+                    description = "Charging station with this ID does not exist."
+            ),
+            @APIResponse(responseCode = "500",
+                    description = "Unknown error while booking."
+            ),
+            @APIResponse(responseCode = "200",
+                    description = "Booking succesful, returns a transaction confirmation.",
+                    content = @Content(
+                            schema = @Schema(implementation = Racun.class))),
+    })
     /** Create new racun **/
     @POST
     @Path("/rezerviraj")
     @Produces("application/json")
-    public Response createRacun_(String body) {
+    public Response createRacun_(@RequestBody(
+            description = "Body containing IP-s to users and charging stations microservices as u_host, p_host and the transaction as racun",
+            required = true) String body) {
         System.out.println(body);
 
         if (body.isEmpty()) {
@@ -367,7 +431,21 @@ public class RacunResource {
         return Response.status(Response.Status.OK).entity(polnilnice_host).build();
     }
 
-    /** Create new racun **/
+
+    /** Odpovej termin **/
+    @Operation(description = "Cancel booking and refund (Using service discovery to user and charging stations microservice).", summary = "Cancel booking")
+    @APIResponses({
+            @APIResponse(responseCode = "404",
+                    description = "Transaction for this booking not found. Contact support."
+            ),
+            @APIResponse(responseCode = "500",
+                    description = "Error while parsing user received from user microservice."),
+            @APIResponse(responseCode = "200",
+                    description = "Cancelation succesful. Returns confirmation transaction.",
+                    content = @Content(
+                        schema = @Schema(implementation = Racun.class))),
+    })
+
     @POST
     @Path("/odpovej/{terminId}")
     @Produces("application/json")
@@ -416,10 +494,23 @@ public class RacunResource {
 
     }
 
+    @Operation(description = "Cancel booking and refund (Using service discovery to user and charging stations microservice).", summary = "Cancel booking")
+    @APIResponses({
+            @APIResponse(responseCode = "500",
+                    description = "Error while parsing user received from user microservice."),
+            @APIResponse(responseCode = "404",
+                    description = "User with provided id not found"),
+            @APIResponse(responseCode = "200",
+                    description = "Transaction succesful, funds added. Returns confirmation transaction.",
+                    content = @Content(
+                            schema = @Schema(implementation = Racun.class))),
+    })
     @POST
     @Path("/nakazi_/{uporabnik_id}")
     @Produces("application/json")
-    public Response nakazi_(@PathParam("uporabnik_id") Integer uporabnikId, String body) {
+    public Response nakazi_(@PathParam("uporabnik_id") Integer uporabnikId,@RequestBody(
+            description = "Body containing added funs as 'nakazilo' and IP of users microservice as 'u_host'",
+            required = true) String body) {
         if (body.isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST).entity("No POST body found.").build();
         }

@@ -1,5 +1,8 @@
 package si.fri.rso.placila.api.v1.resources;
 
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import si.fri.rso.placila.services.config.RestProperties;
 
 import javax.enterprise.context.ApplicationScoped;
@@ -22,6 +25,11 @@ public class DemoResource {
     @Inject
     private RestProperties restProperties;
 
+    @Operation(description = "Make microservice unhealthy, health check will go down.", summary = "Break microservice")
+    @APIResponses({
+        @APIResponse(responseCode = "200",
+                description = "Health check down."
+    )})
     @POST
     @Path("break")
     public Response makeUnhealthy() {
