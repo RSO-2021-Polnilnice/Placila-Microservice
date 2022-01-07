@@ -13,6 +13,9 @@ kumuluzee:
       connection-url: jdbc:postgresql://192.168.99.100:5434/racuni
       username: dbuser
       password: postgres
+      pool:
+        min-size: 0
+        max-size: 2
   config:
     consul:
       agent: http://consul:8500
