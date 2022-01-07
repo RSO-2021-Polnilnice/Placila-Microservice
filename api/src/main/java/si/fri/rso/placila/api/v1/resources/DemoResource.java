@@ -1,5 +1,6 @@
 package si.fri.rso.placila.api.v1.resources;
 
+import com.kumuluz.ee.cors.annotations.CrossOrigin;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
@@ -19,6 +20,7 @@ import java.util.logging.Logger;
 @Path("/demo")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
+@CrossOrigin(supportedMethods = "GET, POST, PUT, HEAD, DELETE, OPTIONS")
 public class DemoResource {
     private Logger log = Logger.getLogger(DemoResource.class.getName());
 

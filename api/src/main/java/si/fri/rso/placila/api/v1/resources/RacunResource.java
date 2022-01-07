@@ -42,7 +42,7 @@ import java.util.Optional;
 @Path("/placila")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@CrossOrigin(allowOrigin = "*")
+@CrossOrigin(supportedMethods = "GET, POST, PUT, HEAD, DELETE, OPTIONS")
 public class RacunResource {
 
     @Inject
